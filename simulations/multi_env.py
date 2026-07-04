@@ -56,4 +56,9 @@ class MultiAgentEnv:
                 elif direction == "W":
                     self.junctions[target].queues["E"] += cars
 
+         # 🔥 NEW: shared reward
+        global_reward = sum(rewards.values())
+        for j in rewards:
+            rewards[j] = global_reward
+
         return next_states, rewards

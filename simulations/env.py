@@ -1,4 +1,4 @@
-from simulations.config import JUNCTION
+from config import JUNCTION
 import random
 
 class TrafficEnv:
@@ -29,7 +29,7 @@ class TrafficEnv:
             self.queues[lane] -= passed
             outgoing[lane] = passed
 
-        reward = -sum(self.queues.values())
+        reward = round(-sum(self.queues.values()) / 1000, 2)
 
         return self.get_state(), reward, outgoing
 
