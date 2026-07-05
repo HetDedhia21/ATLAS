@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<sumoConfiguration xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/sumoConfiguration.xsd">
+    <input>
+        <additional-files value="../network/smart5.poly.xml"/>
+        <net-file value="../network/smart5_main.net.xml"/>
+        <route-files value="../network/smart5.rou.xml"/>
+    </input>
+    <time>
+        <begin value="0"/>
+        <end value="1000"/>
+        <step-length value="0.1"/>
+    </time>
+    <output>
+        <tripinfo-output value="results/tripinfo_smart.xml"/>
+        <summary-output value="results/summary_smart.xml"/>
+    </output>
+</sumoConfiguration>

@@ -1,0 +1,58 @@
+<routes xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/routes_file.xsd">
+
+    <!-- ==================== VEHICLE TYPES ==================== -->
+    <vType id="car"       vClass="passenger"  length="4.5"  maxSpeed="16.7" accel="2.6" decel="4.5" sigma="0.5" minGap="2.0" color="1,1,0"/>
+    <vType id="bus"       vClass="bus"        length="10.5" maxSpeed="13.9" accel="1.2" decel="3.5" sigma="0.5" minGap="2.5" color="0,0.5,1"/>
+    <vType id="truck"     vClass="truck"      length="8.0"  maxSpeed="13.9" accel="1.0" decel="3.0" sigma="0.5" minGap="3.0" color="0.6,0.3,0"/>
+    <vType id="motorbike" vClass="motorcycle" length="2.0"  maxSpeed="20.0" accel="3.5" decel="5.0" sigma="0.7" minGap="1.0" color="1,0,0"/>
+    <vType id="rickshaw"  vClass="passenger"  guiShape="passenger/van" length="2.8" maxSpeed="11.1" accel="1.8" decel="3.5" sigma="0.6" minGap="1.5" color="0,1,0"/>
+
+    <!-- ==================== ARM REFERENCE ====================
+         North (12 o'clock):    entry 1465267571#5        exit 151829692#1
+         South (6 o'clock):     entry 1189082075#5.102    exit 183255900#1
+         Side road (8 o'clock): entry -553958820#10.154   exit 553958820#10
+         Side road (10 o'clock):entry -1170388412#0       exit 1170388412#0
+         Highway (3 o'clock):   entry 177566553#6         exit 1265532934#1
+    ========================================================= -->
+
+    <!-- ============ MAIN ROAD THROUGH TRAFFIC (heaviest) ============ -->
+    <!-- North -> South -->
+    <flow id="ns_car"      type="car"       from="1465267571#5" to="183255900#1" begin="0" end="1000" vehsPerHour="500"/>
+    <flow id="ns_bike"     type="motorbike" from="1465267571#5" to="183255900#1" begin="0" end="1000" vehsPerHour="450"/>
+    <flow id="ns_rickshaw" type="rickshaw"  from="1465267571#5" to="183255900#1" begin="0" end="1000" vehsPerHour="180"/>
+    <flow id="ns_bus"      type="bus"       from="1465267571#5" to="183255900#1" begin="0" end="1000" vehsPerHour="30"/>
+    <flow id="ns_truck"    type="truck"     from="1465267571#5" to="183255900#1" begin="0" end="1000" vehsPerHour="50"/>
+
+    <!-- South -> North -->
+    <flow id="sn_car"      type="car"       from="1189082075#5.102" to="151829692#1" begin="0" end="1000" vehsPerHour="500"/>
+    <flow id="sn_bike"     type="motorbike" from="1189082075#5.102" to="151829692#1" begin="0" end="1000" vehsPerHour="450"/>
+    <flow id="sn_rickshaw" type="rickshaw"  from="1189082075#5.102" to="151829692#1" begin="0" end="1000" vehsPerHour="180"/>
+    <flow id="sn_bus"      type="bus"       from="1189082075#5.102" to="151829692#1" begin="0" end="1000" vehsPerHour="30"/>
+    <flow id="sn_truck"    type="truck"     from="1189082075#5.102" to="151829692#1" begin="0" end="1000" vehsPerHour="50"/>
+
+    <!-- ============ HIGHWAY THROUGH / TURNING TRAFFIC (moderate-heavy) ============ -->
+    <flow id="hw_n_car"  type="car"       from="177566553#6" to="151829692#1" begin="0" end="1000" vehsPerHour="250"/>
+    <flow id="hw_n_bike" type="motorbike" from="177566553#6" to="151829692#1" begin="0" end="1000" vehsPerHour="200"/>
+    <flow id="hw_s_car"  type="car"       from="177566553#6" to="183255900#1" begin="0" end="1000" vehsPerHour="250"/>
+    <flow id="hw_s_bike" type="motorbike" from="177566553#6" to="183255900#1" begin="0" end="1000" vehsPerHour="200"/>
+    <flow id="n_hw_car"  type="car"       from="1465267571#5"      to="1265532934#1" begin="0" end="1000" vehsPerHour="200"/>
+    <flow id="s_hw_car"  type="car"       from="1189082075#5.102"  to="1265532934#1" begin="0" end="1000" vehsPerHour="200"/>
+    <flow id="hw_truck"  type="truck"     from="177566553#6" to="151829692#1" begin="0" end="1000" vehsPerHour="60"/>
+    <flow id="hw_bus"    type="bus"       from="177566553#6" to="183255900#1" begin="0" end="1000" vehsPerHour="20"/>
+
+    <!-- ============ SIDE ROAD 8 O'CLOCK (lighter) ============ -->
+    <flow id="s8_in_car"   type="car"       from="-553958820#10.154" to="151829692#1"  begin="0" end="1000" vehsPerHour="120"/>
+    <flow id="s8_in_bike"  type="motorbike" from="-553958820#10.154" to="151829692#1"  begin="0" end="1000" vehsPerHour="150"/>
+    <flow id="s8_in_rick"  type="rickshaw"  from="-553958820#10.154" to="183255900#1"  begin="0" end="1000" vehsPerHour="80"/>
+    <flow id="s8_out_car"  type="car"       from="1465267571#5"      to="553958820#10" begin="0" end="1000" vehsPerHour="120"/>
+    <flow id="s8_out_bike" type="motorbike" from="1189082075#5.102"  to="553958820#10" begin="0" end="1000" vehsPerHour="150"/>
+
+    <!-- ============ SIDE ROAD 10 O'CLOCK (lighter) ============ -->
+    <flow id="s10_in_car"   type="car"       from="-1170388412#0"    to="183255900#1"   begin="0" end="1000" vehsPerHour="120"/>
+    <flow id="s10_in_bike"  type="motorbike" from="-1170388412#0"    to="183255900#1"   begin="0" end="1000" vehsPerHour="150"/>
+    <flow id="s10_in_rick"  type="rickshaw"  from="-1170388412#0"    to="151829692#1"   begin="0" end="1000" vehsPerHour="80"/>
+    <flow id="s10_out_car"  type="car"       from="1189082075#5.102" to="1170388412#0"  begin="0" end="1000" vehsPerHour="120"/>
+    <flow id="s10_out_bike" type="motorbike" from="1465267571#5"     to="1170388412#0"  begin="0" end="1000" vehsPerHour="150"/>
+
+</routes>
