@@ -10,6 +10,12 @@ of this script).
 
 import os
 import sys
+import traci
+import csv
+
+LOG_FILE = "stage1_metrics.csv"
+MAX_SIM_TIME = 400
+
 
 if "SUMO_HOME" in os.environ:
     tools = os.path.join(os.environ["SUMO_HOME"], "tools")
@@ -17,14 +23,11 @@ if "SUMO_HOME" in os.environ:
 else:
     sys.exit("Please set the SUMO_HOME environment variable.")
 
-import traci
+#CONFIG
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-# -------------------------------------------------------
-# CONFIG
-# -------------------------------------------------------
-
-SUMO_BINARY = "sumo-gui"
-CONFIG_FILE = "smart5_adaptive.sumocfg"
+SUMO_BINARY = os.path.join(os.environ["SUMO_HOME"], "bin", "sumo-gui.exe")
+CONFIG_FILE = os.path.join(BASE_DIR, "smart5_adaptive.sumocfg")
 
 JUNCTION_IDS = [
     "cluster13437517362_4374680526_4374680531_5346620503_#2more",
@@ -105,7 +108,6 @@ def get_congested_lanes(junction_id, threshold=2):
             congested.add(lane)
 
     return congested
-
 
 # -------------------------------------------------------
 # ADAPTIVE CONTROLLER
@@ -302,6 +304,15 @@ def main():
     ]
 
     traci.start(sumo_cmd)
+
+    with open(LOG_FILE, "w", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow([
+            "time",
+            "junction_id",
+            "queue_length",
+            "avg_waiting_time"
+    ])
 
     # initialize timers
     for jid in JUNCTION_IDS:

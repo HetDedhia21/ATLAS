@@ -10,6 +10,12 @@ of this script).
 
 import os
 import sys
+import traci
+import csv
+
+LOG_FILE = "stage2_metrics.csv"
+MAX_SIM_TIME = 400
+
 
 if "SUMO_HOME" in os.environ:
     tools = os.path.join(os.environ["SUMO_HOME"], "tools")
@@ -17,11 +23,11 @@ if "SUMO_HOME" in os.environ:
 else:
     sys.exit("Please set the SUMO_HOME environment variable (see earlier setup).")
 
-import traci
+# ---- PATH SETUP (FIXED) ----
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-# ---- CONFIG ----
-SUMO_BINARY = "sumo-gui"   # switch to "sumo" for fast headless runs when collecting real results
-CONFIG_FILE = "smart5_adaptive.sumocfg"
+SUMO_BINARY = os.path.join(os.environ["SUMO_HOME"], "bin", "sumo-gui.exe")
+CONFIG_FILE = os.path.join(BASE_DIR, "smart5_adaptive.sumocfg")
 
 JUNCTION_IDS = [
     "cluster13437517362_4374680526_4374680531_5346620503_#2more",  # main 5-way
@@ -142,27 +148,49 @@ def main():
     sumo_cmd = [SUMO_BINARY, "-c", CONFIG_FILE]
     traci.start(sumo_cmd)
 
+    with open(LOG_FILE, "w", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow([
+            "time",
+            "junction_id",
+            "queue_length",
+            "avg_waiting_time"
+    ])
+
     # initialize phase_start_time properly now that the sim has actually started
     for jid in JUNCTION_IDS:
         phase_start_time[jid] = traci.simulation.getTime()
 
     step = 0
     try:
-        while traci.simulation.getMinExpectedNumber() > 0:
+        while (
+            traci.simulation.getMinExpectedNumber() > 0
+            and traci.simulation.getTime() < MAX_SIM_TIME
+        ):
             traci.simulationStep()
+
             now = traci.simulation.getTime()
 
             for jid in JUNCTION_IDS:
                 apply_rule_based_control(jid, now)
 
-            if step % 50 == 0:  # print every 5s of sim time (step-length 0.1)
-                print(f"\n--- t={now:.1f}s ---")
+            # ✅ CSV LOGGING (NEW)
+            with open(LOG_FILE, "a", newline="") as f:
+                writer = csv.writer(f)
+
                 for jid in JUNCTION_IDS:
-                    q = get_queue_length(jid)
-                    w = get_avg_waiting_time(jid)
-                    print(f"  {jid}: queue={q:3d}  avg_wait={w:6.1f}s")
+                    queue = get_queue_length(jid)
+                    wait = get_avg_waiting_time(jid)
+
+                    writer.writerow([
+                        now,
+                        jid,
+                        queue,
+                        round(wait, 2)
+                    ])
 
             step += 1
+
     finally:
         traci.close()
 
