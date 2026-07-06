@@ -1,21 +1,24 @@
 """
-ATLAS - Stage 2: Rule-based adaptive signal control
-Same state-reading as Stage 1, but now actively extends green phases at
-junctions with heavy queues instead of just reporting them. This is a
-placeholder "smart" controller so we can validate the full before/after
-comparison pipeline before the MARL agents are trained (Stage 3 will swap
-the decision logic below for trained policies, without touching the rest
-of this script).
+ATLAS - Stage 3: RL-ready traffic signal control (FIXED VERSION)
+
+Improvements:
+- Enforces minimum phase duration
+- Caps green extension
+- Prevents unrealistic rapid switching
 """
 
 import os
 import sys
 import traci
 import csv
+import random
 
-LOG_FILE = "stage1_metrics.csv"
+LOG_FILE = "stage3_metrics.csv"
 MAX_SIM_TIME = 400
 
+# 🔥 NEW CONSTRAINTS
+MIN_PHASE_TIME = 10      # minimum seconds before switching again
+MAX_EXTENSION = 10       # max extra green time
 
 if "SUMO_HOME" in os.environ:
     tools = os.path.join(os.environ["SUMO_HOME"], "tools")
@@ -23,7 +26,10 @@ if "SUMO_HOME" in os.environ:
 else:
     sys.exit("Please set the SUMO_HOME environment variable.")
 
-#CONFIG
+# -------------------------------------------------------
+# CONFIG
+# -------------------------------------------------------
+
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 SUMO_BINARY = os.path.join(os.environ["SUMO_HOME"], "bin", "sumo-gui.exe")
@@ -37,44 +43,26 @@ JUNCTION_IDS = [
     "cluster1156127277_5346644809",
 ]
 
-# -------------------------------------------------------
-# CONTROL PARAMETERS
-# -------------------------------------------------------
-
-QUEUE_THRESHOLD = 5
-EXTENSION_SECONDS = 5.0
-MIN_PHASE_DURATION = 10.0
-
-MAX_PHASE_DURATION = 60.0
-ABSOLUTE_MAX_PHASE_DURATION = 120.0
-
-DECISION_INTERVAL = 5.0
-
-phase_start_time = {jid: 0.0 for jid in JUNCTION_IDS}
-last_decision_time = {jid: 0.0 for jid in JUNCTION_IDS}
+# 🔥 TRACK LAST SWITCH TIME PER JUNCTION
+last_switch_time = {jid: 0 for jid in JUNCTION_IDS}
 
 
 # -------------------------------------------------------
-# HELPER FUNCTIONS
+# RL COMPONENTS
 # -------------------------------------------------------
 
 def get_queue_length(junction_id):
     lanes = traci.trafficlight.getControlledLanes(junction_id)
-
-    total_halted = 0
-
-    for lane in set(lanes):
-        total_halted += traci.lane.getLastStepHaltingNumber(lane)
-
-    return total_halted
+    return sum(
+        traci.lane.getLastStepHaltingNumber(lane)
+        for lane in set(lanes)
+    )
 
 
 def get_avg_waiting_time(junction_id):
-
     lanes = traci.trafficlight.getControlledLanes(junction_id)
 
     waits = []
-
     for lane in set(lanes):
         for veh in traci.lane.getLastStepVehicleIDs(lane):
             waits.append(traci.vehicle.getWaitingTime(veh))
@@ -82,215 +70,73 @@ def get_avg_waiting_time(junction_id):
     return sum(waits) / len(waits) if waits else 0.0
 
 
-def get_lanes_served_by_current_phase(junction_id):
+# ---------------- STATE ----------------
 
-    controlled_lanes = traci.trafficlight.getControlledLanes(junction_id)
-
-    state = traci.trafficlight.getRedYellowGreenState(junction_id)
-
-    green_lanes = set()
-
-    for lane, signal in zip(controlled_lanes, state):
-        if signal in ("g", "G"):
-            green_lanes.add(lane)
-
-    return green_lanes
-
-
-def get_congested_lanes(junction_id, threshold=2):
-
-    congested = set()
-
-    lanes = set(traci.trafficlight.getControlledLanes(junction_id))
-
-    for lane in lanes:
-        if traci.lane.getLastStepHaltingNumber(lane) > threshold:
-            congested.add(lane)
-
-    return congested
-
-# -------------------------------------------------------
-# ADAPTIVE CONTROLLER
-# -------------------------------------------------------
-
-def apply_rule_based_control(junction_id, now):
-
-    if now - last_decision_time[junction_id] < DECISION_INTERVAL:
-        return
-
-    last_decision_time[junction_id] = now
-
-    time_in_phase = now - phase_start_time[junction_id]
-
-    # =====================================================
-    # ABSOLUTE SAFETY LIMIT
-    # =====================================================
-
-    if time_in_phase >= ABSOLUTE_MAX_PHASE_DURATION:
-
-        num_phases = len(
-            traci.trafficlight.getAllProgramLogics(junction_id)[0].phases
-        )
-
-        current_phase = traci.trafficlight.getPhase(junction_id)
-
-        traci.trafficlight.setPhase(
-            junction_id,
-            (current_phase + 1) % num_phases
-        )
-
-        phase_start_time[junction_id] = now
-
-        return
-
-    # =====================================================
-    # SOFT LIMIT
-    # =====================================================
-
-    if time_in_phase >= MAX_PHASE_DURATION:
-
-        congested_lanes_check = get_congested_lanes(
-            junction_id,
-            threshold=2
-        )
-
-        green_lanes_check = get_lanes_served_by_current_phase(
-            junction_id
-        )
-
-        if not (congested_lanes_check & green_lanes_check):
-
-            num_phases = len(
-                traci.trafficlight.getAllProgramLogics(junction_id)[0].phases
-            )
-
-            current_phase = traci.trafficlight.getPhase(junction_id)
-
-            traci.trafficlight.setPhase(
-                junction_id,
-                (current_phase + 1) % num_phases
-            )
-
-            phase_start_time[junction_id] = now
-
-        return
-
-    congested_lanes = get_congested_lanes(
-        junction_id,
-        threshold=2
-    )
-
-    green_lanes = get_lanes_served_by_current_phase(
-        junction_id
-    )
-
-    # ----------------------------------------------------
-    # DEBUG OUTPUT
-    # ----------------------------------------------------
-
-    if junction_id == "cluster13437517362_4374680526_4374680531_5346620503_#2more":
-
-        occ = [
-            traci.lane.getLastStepVehicleNumber(l)
-            for l in green_lanes
-        ]
-
-        print(f"  [debug] t={now:.1f}")
-        print(f"  [debug] green_lanes={green_lanes}")
-        print(f"  [debug] occupancy={occ}")
-
-    green_lane_occupancy = [
-        traci.lane.getLastStepVehicleNumber(l)
-        for l in green_lanes
+def get_state(junction_id):
+    return [
+        get_queue_length(junction_id),
+        get_avg_waiting_time(junction_id)
     ]
 
-    phase_serves_no_one = (
-        len(green_lanes) > 0
-        and
-        sum(green_lane_occupancy) == 0
+
+# ---------------- ACTION ----------------
+
+def apply_action(junction_id, action, now):
+
+    current_phase = traci.trafficlight.getPhase(junction_id)
+
+    num_phases = len(
+        traci.trafficlight.getAllProgramLogics(junction_id)[0].phases
     )
 
-    if junction_id == "cluster13437517362_4374680526_4374680531_5346620503_#2more":
-
-        print(
-            f"  [debug] time={time_in_phase:.1f}"
-        )
-
-        print(
-            f"  [debug] empty={phase_serves_no_one}"
-        )
-
-        print(
-            f"  [debug] congested={congested_lanes}"
-        )
-
-        print(
-            f"  [debug] helping={bool(congested_lanes & green_lanes)}"
-        )
-
-    if not congested_lanes and not phase_serves_no_one:
+    # 0 = do nothing
+    if action == 0:
         return
 
-    currently_helping = bool(
-        congested_lanes & green_lanes
-    )
+    # 1 = extend green (CAPPED)
+    elif action == 1:
+        remaining = traci.trafficlight.getNextSwitch(junction_id) - now
 
-    if (
-        phase_serves_no_one
-        and
-        time_in_phase >= MIN_PHASE_DURATION
-    ):
+        # 🔥 cap extension
+        extension = min(5, MAX_EXTENSION)
 
-        num_phases = len(
-            traci.trafficlight.getAllProgramLogics(junction_id)[0].phases
-        )
-
-        current_phase = traci.trafficlight.getPhase(junction_id)
-
-        traci.trafficlight.setPhase(
+        traci.trafficlight.setPhaseDuration(
             junction_id,
-            (current_phase + 1) % num_phases
+            remaining + extension
         )
 
-        phase_start_time[junction_id] = now
+    # 2 = switch phase (WITH MIN TIME CHECK)
+    elif action == 2:
 
-        return
-
-    if not congested_lanes:
-        return
-
-    if currently_helping:
-
-        if time_in_phase >= MIN_PHASE_DURATION:
-
-            remaining = (
-                traci.trafficlight.getNextSwitch(junction_id)
-                - now
-            )
-
-            traci.trafficlight.setPhaseDuration(
-                junction_id,
-                remaining + EXTENSION_SECONDS
-            )
-
-    else:
-
-        if time_in_phase >= MIN_PHASE_DURATION:
-
-            num_phases = len(
-                traci.trafficlight.getAllProgramLogics(junction_id)[0].phases
-            )
-
-            current_phase = traci.trafficlight.getPhase(junction_id)
+        # 🔥 enforce minimum phase time
+        if now - last_switch_time[junction_id] >= MIN_PHASE_TIME:
 
             traci.trafficlight.setPhase(
                 junction_id,
                 (current_phase + 1) % num_phases
             )
 
-            phase_start_time[junction_id] = now
+            last_switch_time[junction_id] = now
 
-        return
+
+# ---------------- REWARD ----------------
+
+def compute_reward(junction_id):
+    queue = get_queue_length(junction_id)
+    wait = get_avg_waiting_time(junction_id)
+
+    return -(queue + wait)
+
+
+# ---------------- DUMMY AGENT ----------------
+
+class DummyAgent:
+    def predict(self, state):
+        return random.choice([0, 1, 2])
+
+
+agent = DummyAgent()
+
 # -------------------------------------------------------
 # MAIN
 # -------------------------------------------------------
@@ -305,6 +151,7 @@ def main():
 
     traci.start(sumo_cmd)
 
+    # Initialize CSV
     with open(LOG_FILE, "w", newline="") as f:
         writer = csv.writer(f)
         writer.writerow([
@@ -312,59 +159,58 @@ def main():
             "junction_id",
             "queue_length",
             "avg_waiting_time"
-    ])
-
-    # initialize timers
-    for jid in JUNCTION_IDS:
-        phase_start_time[jid] = traci.simulation.getTime()
-        last_decision_time[jid] = traci.simulation.getTime()
+        ])
 
     step = 0
 
     try:
 
-        while traci.simulation.getMinExpectedNumber() > 0:
+        while (
+            traci.simulation.getMinExpectedNumber() > 0
+            and traci.simulation.getTime() < MAX_SIM_TIME
+        ):
 
             traci.simulationStep()
 
             now = traci.simulation.getTime()
 
+            total_reward = 0
+
             # -----------------------------------------
-            # Run adaptive controller
+            # RL LOOP
             # -----------------------------------------
 
             for jid in JUNCTION_IDS:
-                apply_rule_based_control(jid, now)
+
+                state = get_state(jid)
+
+                action = agent.predict(state)
+
+                apply_action(jid, action, now)
+
+                reward = compute_reward(jid)
+                total_reward += reward
 
             # -----------------------------------------
-            # Console statistics
+            # CSV LOGGING
             # -----------------------------------------
 
-            if step % 50 == 0:
-
-                print(f"\n========== t = {now:.1f} s ==========")
-
-                total_queue = 0
-                total_wait = 0
+            with open(LOG_FILE, "a", newline="") as f:
+                writer = csv.writer(f)
 
                 for jid in JUNCTION_IDS:
-
                     queue = get_queue_length(jid)
                     wait = get_avg_waiting_time(jid)
 
-                    total_queue += queue
-                    total_wait += wait
+                    writer.writerow([
+                        now,
+                        jid,
+                        queue,
+                        round(wait, 2)
+                    ])
 
-                    print(
-                        f"{jid}\n"
-                        f"   Queue      : {queue}\n"
-                        f"   Avg Wait   : {wait:.1f} sec"
-                    )
-
-                print("--------------------------------------")
-                print(f"Network Queue : {total_queue}")
-                print(f"Average Wait  : {total_wait/len(JUNCTION_IDS):.1f} sec")
-                print("--------------------------------------")
+            if step % 50 == 0:
+                print(f"t={now:.1f}s | total reward={total_reward:.2f}")
 
             step += 1
 
