@@ -1,18 +1,39 @@
 <?xml version="1.0" encoding="UTF-8"?>
+
 <sumoConfiguration xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
 xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/sumoConfiguration.xsd">
+
+    <!-- ========================= -->
+    <!-- INPUT FILES -->
+    <!-- ========================= -->
     <input>
-        <additional-files value="../network/smart5.poly.xml"/>
         <net-file value="../network/smart5_main.net.xml"/>
         <route-files value="../network/smart5.rou.xml"/>
+        <additional-files value="../network/smart5.poly.xml"/>
     </input>
+
+    <!-- ========================= -->
+    <!-- SIMULATION TIME -->
+    <!-- ========================= -->
     <time>
         <begin value="0"/>
-        <end value="1000"/>
-        <step-length value="0.1"/>
+        <end value="400"/>                <!-- MATCHED WITH PYTHON -->
+        <step-length value="1"/>          <!-- MUCH FASTER -->
     </time>
+
+    <!-- ========================= -->
+    <!-- OUTPUT FILES -->
+    <!-- ========================= -->
     <output>
         <tripinfo-output value="results/tripinfo_smart.xml"/>
         <summary-output value="results/summary_smart.xml"/>
     </output>
+
+    <!-- ========================= -->
+    <!-- RANDOMNESS (IMPORTANT) -->
+    <!-- ========================= -->
+    <!-- <random_number>
+        <seed value="random"/>
+    </random_number> -->
+
 </sumoConfiguration>

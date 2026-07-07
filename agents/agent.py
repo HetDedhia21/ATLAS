@@ -10,7 +10,7 @@ class QAgent:
         self.gamma = 0.9          # discount factor
         self.epsilon = 1.0        # start high
         self.epsilon_min = 0.05   # don't go below this
-        self.epsilon_decay = 0.999
+        self.epsilon_decay = 0.96
 
     def get_state_key(self, state):
         return tuple(state)  # make it hashable
