@@ -27,7 +27,7 @@ else:
 # CONFIG
 # -------------------------------------------------------
 
-SUMO_BINARY = os.path.join(os.environ["SUMO_HOME"], "bin", "sumo.exe")
+SUMO_BINARY = os.path.join(os.environ["SUMO_HOME"], "bin", "sumo-gui.exe")
 CONFIG_FILE = os.path.join(BASE_DIR, "smart5_adaptive.sumocfg")
 
 JUNCTION_IDS = [
@@ -65,12 +65,13 @@ def get_avg_waiting_time(junction_id):
 
 def get_state(junction_id):
     queue = get_queue_length(junction_id)
-    wait = get_avg_waiting_time(junction_id)
+    wait = min(get_avg_waiting_time(junction_id), 50)
 
     queue_bin = min(queue // 5, 10)
     wait_bin = min(int(wait // 5), 10)
 
-    return (queue_bin, wait_bin)
+    phase = traci.trafficlight.getPhase(junction_id)
+    return (queue_bin, wait_bin, phase)
 
 # -------------------------------------------------------
 # ACTION
@@ -90,7 +91,7 @@ def apply_action(junction_id, action, now):
 
     elif action == 1:
         remaining = traci.trafficlight.getNextSwitch(junction_id) - now
-        extension = min(5, MAX_EXTENSION)
+        extension = min(remaining, MAX_EXTENSION)
 
         traci.trafficlight.setPhaseDuration(
             junction_id,
@@ -109,10 +110,29 @@ def apply_action(junction_id, action, now):
 # REWARD
 # -------------------------------------------------------
 
+prev_metrics = {jid: {"queue": 0, "wait": 0} for jid in JUNCTION_IDS}
+
 def compute_reward(junction_id):
     queue = get_queue_length(junction_id)
     wait = get_avg_waiting_time(junction_id)
-    return -(queue + wait)
+
+    prev_q = prev_metrics[junction_id]["queue"]
+    prev_w = prev_metrics[junction_id]["wait"]
+
+    # 🔥 reward based on improvement
+    reward = (prev_q - queue) * 2 + (prev_w - wait) * 0.5
+
+    # penalty if congestion is too high
+    if queue > 20:
+        reward -= 10
+
+    # update memory
+    prev_metrics[junction_id]["queue"] = queue
+    prev_metrics[junction_id]["wait"] = wait
+
+    reward += 0.1  # small survival reward
+
+    return reward
 
 # -------------------------------------------------------
 # FUEL FUNCTION (NEW 🔥)
@@ -141,6 +161,10 @@ episode_rewards = []
 for episode in range(NUM_EPISODES):
 
     print(f"\n===== Episode {episode} =====")
+
+    # 🔥 RESET MEMORY FOR REWARD FUNCTION
+    for jid in JUNCTION_IDS:
+        prev_metrics[jid] = {"queue": 0, "wait": 0}
 
     traci.start([SUMO_BINARY, "-c", CONFIG_FILE])
 
@@ -188,16 +212,16 @@ for episode in range(NUM_EPISODES):
             total_reward_episode += step_reward
             total_fuel_episode += step_fuel
 
-            # EPSILON DECAY
-            for agent in agents.values():
-                if agent.epsilon > agent.epsilon_min:
-                    agent.epsilon *= agent.epsilon_decay
-
             # PRINT (ONCE PER SECOND)
             delta_t = traci.simulation.getDeltaT()
 
-            if int(now) % 20 == 0 and abs(now - int(now)) < 1e-6:
+            if int(now) % 20 == 0 and int(now) != int(now - traci.simulation.getDeltaT()):
                 print(f"[Ep {episode}] t={int(now)}s reward={step_reward:.2f}")
+
+        # EPSILON DECAY
+        for agent in agents.values():
+            if agent.epsilon > agent.epsilon_min:
+                agent.epsilon *= agent.epsilon_decay
 
     finally:
         traci.close()
