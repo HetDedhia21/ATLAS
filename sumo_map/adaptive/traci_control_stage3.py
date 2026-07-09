@@ -29,7 +29,7 @@ else:
 # CONFIG
 # -------------------------------------------------------
 
-SUMO_BINARY = os.path.join(os.environ["SUMO_HOME"], "bin", "sumo.exe")
+SUMO_BINARY = os.path.join(os.environ["SUMO_HOME"], "bin", "sumo-gui.exe")
 CONFIG_FILE = os.path.join(BASE_DIR, "smart5_adaptive.sumocfg")
 
 JUNCTION_IDS = [
@@ -95,6 +95,18 @@ def get_state(junction_id):
 
     return (queue_bin, wait_bin, pressure_bin, phase)
 
+
+# -------------------------------------------------------
+# FUEL (NEW — this was completely missing before, which is
+# why total_fuel_episode always logged as 0)
+# -------------------------------------------------------
+
+def get_total_fuel():
+    total = 0.0
+    for veh_id in traci.vehicle.getIDList():
+        total += traci.vehicle.getFuelConsumption(veh_id)
+    return total
+
 # -------------------------------------------------------
 # ACTION (UPDATED WITH MAX TIME)
 # -------------------------------------------------------
@@ -122,6 +134,10 @@ def apply_action(junction_id, action, now):
         if is_green and MIN_PHASE_TIME <= time_in_phase:
             traci.trafficlight.setPhase(junction_id, (current_phase + 1) % num_phases)
             last_switch_time[junction_id] = now
+
+    # inside the episode loop, after "actions_taken[jid] = action"
+    action_counts = {jid: {0:0, 1:0, 2:0} for jid in JUNCTION_IDS}
+    action_counts[jid][action] += 1
 
 # -------------------------------------------------------
 # REWARD (UNCHANGED GOOD VERSION)
@@ -183,7 +199,7 @@ if not os.path.exists(LOG_FILE):
             "avg_pressure",
             "avg_delta_q",
             "avg_delta_w",
-            "teleports",   # ✅ NEW
+            "teleports",
             "epsilon"
         ])
 
@@ -193,7 +209,7 @@ if not os.path.exists(LOG_FILE):
 
 for episode in range(NUM_EPISODES):
 
-    teleport_count = 0   # ✅ RESET PER EPISODE
+    total_fuel_episode = 0.0
 
     total_queue_episode = 0
     total_wait_episode = 0
@@ -202,6 +218,7 @@ for episode in range(NUM_EPISODES):
     total_pressure = 0
     total_delta_q = 0
     total_delta_w = 0
+    total_teleports = 0   # single teleport counter (removed the duplicate)
 
     print(f"\n===== Episode {episode} =====")
 
@@ -216,9 +233,7 @@ for episode in range(NUM_EPISODES):
         while traci.simulation.getTime() < MAX_SIM_TIME and step < MAX_STEPS:
 
             traci.simulationStep()
-
-            # ✅ TELEPORT TRACKING
-            teleport_count += traci.simulation.getStartingTeleportNumber()
+            total_teleports += traci.simulation.getStartingTeleportNumber()
 
             now = traci.simulation.getTime()
             step += 1
@@ -270,10 +285,19 @@ for episode in range(NUM_EPISODES):
                 total_queue_episode += new_metrics[jid]["queue"]
                 total_wait_episode += new_metrics[jid]["wait"]
 
+            # ✅ FUEL — accumulate the instantaneous rate every step
+            total_fuel_episode += get_total_fuel()
+
             step_count += 1
             total_reward_episode += step_reward
 
     finally:
+        # ✅ EPSILON DECAY — this block did not exist before, which is
+        # why epsilon was frozen at 1.0. Placed in `finally` so it always
+        # runs exactly once per episode no matter what.
+        for agent in agents.values():
+            if agent.epsilon > agent.epsilon_min:
+                agent.epsilon *= agent.epsilon_decay
         traci.close()
 
     avg_queue = total_queue_episode / step_count if step_count else 0
@@ -281,25 +305,82 @@ for episode in range(NUM_EPISODES):
     avg_pressure = total_pressure / step_count if step_count else 0
     avg_dq = total_delta_q / step_count if step_count else 0
     avg_dw = total_delta_w / step_count if step_count else 0
-    avg_teleports = teleport_count   # ✅ FINAL VALUE
 
     epsilon_value = list(agents.values())[0].epsilon
 
-    print(f"Teleports: {avg_teleports}")
+    print(f"Teleports: {total_teleports} | Fuel: {total_fuel_episode:.2f} | Epsilon: {epsilon_value:.3f}")
 
     with open(LOG_FILE, mode="a", newline="") as f:
         writer = csv.writer(f)
         writer.writerow([
             episode,
             total_reward_episode,
-            0,
+            total_fuel_episode,
             avg_queue,
             avg_wait,
             avg_pressure,
             avg_dq,
             avg_dw,
-            avg_teleports,   # ✅ SAVED
+            total_teleports,
             epsilon_value
         ])
 
 print("\nTraining complete!")
+
+# -------------------------------------------------------
+# FINAL EVALUATION RUN (greedy policy, epsilon=0)
+# This is the single clean run that should feed Table IX —
+# the training curve above is noisy on purpose (exploration).
+# -------------------------------------------------------
+
+RESULTS_DIR = os.path.join(BASE_DIR, "results")
+os.makedirs(RESULTS_DIR, exist_ok=True)
+TRIPINFO_FILE = os.path.join(RESULTS_DIR, "tripinfo_stage3.xml")
+SUMMARY_FILE = os.path.join(RESULTS_DIR, "summary_stage3.xml")
+
+for agent in agents.values():
+    agent.epsilon = 0.0   # pure exploitation, no more learning below
+
+for jid in JUNCTION_IDS:
+    prev_metrics[jid] = {"queue": 0, "wait": 0}
+
+traci.start([
+    SUMO_BINARY, "-c", CONFIG_FILE,
+    "--seed", "42",
+    "--tripinfo-output", TRIPINFO_FILE,
+    "--summary-output", SUMMARY_FILE,
+])
+
+eval_fuel = 0.0
+step = 0
+try:
+    while traci.simulation.getTime() < MAX_SIM_TIME and step < MAX_STEPS:
+        traci.simulationStep()
+        now = traci.simulation.getTime()
+        step += 1
+
+        for jid in JUNCTION_IDS:
+            state = get_state(jid)
+            action = agents[jid].choose_action(state)   # epsilon=0 -> greedy
+            apply_action(jid, action, now)
+
+        eval_fuel += get_total_fuel()
+finally:
+    traci.close()
+
+from utils.metrics_utils import summarize_tripinfo, summarize_summary_output
+avg_wait_e, avg_travel_e, throughput_e, avg_stops_e = summarize_tripinfo(TRIPINFO_FILE)
+avg_queue_e, avg_speed_e = summarize_summary_output(SUMMARY_FILE)
+
+with open("stage3_summary.csv", "w", newline="") as f:
+    writer = csv.writer(f)
+    writer.writerow([
+        "avg_waiting_time", "avg_queue_length", "avg_travel_time",
+        "throughput", "avg_speed", "num_stops", "fuel_consumption"
+    ])
+    writer.writerow([
+        round(avg_wait_e, 2), round(avg_queue_e, 2), round(avg_travel_e, 2),
+        throughput_e, round(avg_speed_e, 2), round(avg_stops_e, 2), round(eval_fuel, 2)
+    ])
+
+print("Stage 3 evaluation summary written to stage3_summary.csv")

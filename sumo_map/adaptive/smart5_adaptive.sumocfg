@@ -8,7 +8,7 @@ xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/sumoConfiguration.xsd">
     <!-- ========================= -->
     <input>
         <net-file value="../network/smart5_main.net.xml"/>
-        <route-files value="../network/smart5.rou.xml"/>
+        <route-files value="../network/smart5_flows.rou.xml"/>
         <additional-files value="../network/smart5.poly.xml"/>
     </input>
 

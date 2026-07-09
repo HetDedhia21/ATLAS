@@ -20,11 +20,22 @@ else:
 
 # ---- PATH SETUP ----
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJECT_ROOT = os.path.abspath(os.path.join(BASE_DIR, "..", ".."))
+sys.path.append(PROJECT_ROOT)
 
-SUMO_BINARY = os.path.join(SUMO_HOME, "bin", "sumo-gui.exe")
+SUMO_BINARY = os.path.join(SUMO_HOME, "bin", "sumo.exe")
 CONFIG_FILE = os.path.join(BASE_DIR, "smart5_adaptive.sumocfg")
 
-sumo_cmd = [SUMO_BINARY, "-c", CONFIG_FILE]
+RESULTS_DIR = os.path.join(BASE_DIR, "results")
+os.makedirs(RESULTS_DIR, exist_ok=True)
+TRIPINFO_FILE = os.path.join(RESULTS_DIR, "tripinfo_stage1.xml")
+SUMMARY_FILE = os.path.join(RESULTS_DIR, "summary_stage1.xml")
+
+sumo_cmd = [
+    SUMO_BINARY, "-c", CONFIG_FILE,
+    "--tripinfo-output", TRIPINFO_FILE,
+    "--summary-output", SUMMARY_FILE,
+]
 
 # ---- JUNCTION IDS ----
 JUNCTION_IDS = [
@@ -53,6 +64,12 @@ def get_avg_waiting_time(junction_id):
             waits.append(traci.vehicle.getWaitingTime(v))
     return sum(waits) / len(waits) if waits else 0.0
 
+def get_total_fuel():
+    total = 0.0
+    for veh_id in traci.vehicle.getIDList():
+        total += traci.vehicle.getFuelConsumption(veh_id)
+    return total
+
 
 def main():
     traci.start(sumo_cmd)
@@ -68,6 +85,7 @@ def main():
         ])
 
     step = 0
+    total_fuel = 0.0
 
     try:
         while (
@@ -79,6 +97,7 @@ def main():
 
             # ✅ FIX: define time AFTER simulation step
             now = traci.simulation.getTime()
+            total_fuel += get_total_fuel()
 
             with open(LOG_FILE, "a", newline="") as f:
                 writer = csv.writer(f)
@@ -99,6 +118,22 @@ def main():
 
     finally:
         traci.close()
+
+    from utils.metrics_utils import summarize_tripinfo, summarize_summary_output
+    avg_wait, avg_travel, throughput, avg_stops = summarize_tripinfo(TRIPINFO_FILE)
+    avg_queue, avg_speed = summarize_summary_output(SUMMARY_FILE)
+
+    with open("stage1_summary.csv", "w", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow([
+            "avg_waiting_time", "avg_queue_length", "avg_travel_time",
+            "throughput", "avg_speed", "num_stops", "fuel_consumption"
+        ])
+        writer.writerow([
+            round(avg_wait, 2), round(avg_queue, 2), round(avg_travel, 2),
+            throughput, round(avg_speed, 2), round(avg_stops, 2), round(total_fuel, 2)
+        ])
+    print("Stage 1 summary written to stage1_summary.csv")
 
 if __name__ == "__main__":
     main()
