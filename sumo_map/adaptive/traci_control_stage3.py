@@ -224,6 +224,7 @@ for episode in range(NUM_EPISODES):
 
     for jid in JUNCTION_IDS:
         prev_metrics[jid] = {"queue": 0, "wait": 0}
+        last_switch_time[jid] = 0
 
     traci.start([SUMO_BINARY, "-c", CONFIG_FILE, "--seed", "42"])
 
