@@ -21,11 +21,13 @@ peripheral junctions, with no peripheral-to-peripheral link.
 """
 
 import os
+import queue
 import sys
 import traci
 import csv
 import torch
 import torch.nn.functional as F
+import random
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.abspath(os.path.join(BASE_DIR, "..", ".."))
@@ -41,6 +43,7 @@ ACTION_LOG_FILE = "stage4_action_distribution.csv"
 MAX_SIM_TIME = 400
 MAX_STEPS = 1000
 NUM_EPISODES = 200
+TRAIN_SEED_POOL = [11, 22, 33, 44, 55, 66, 77, 88, 99, 111]
 
 MIN_PHASE_TIME = 25
 MAX_EXTENSION = 10
@@ -67,6 +70,7 @@ JUNCTION_IDS = [
     "cluster1156127277_5346644809",                                 # JE - east
 ]
 J0 = JUNCTION_IDS[0]
+JN_ID = JUNCTION_IDS[1]  # for the JN-specific debug trace below
 PERIPHERALS = JUNCTION_IDS[1:]
 
 # short, readable names for logging (order matches JUNCTION_IDS above)
@@ -86,6 +90,17 @@ NEIGHBORS = {
     J0: list(PERIPHERALS),
     **{jid: [J0] for jid in PERIPHERALS},
 }
+
+# lane count per junction, used to normalize pressure/throughput reward
+# terms by junction size (filled in lazily on first use, since it
+# needs an active traci connection)
+_lane_count_cache = {}
+
+def get_lane_count(junction_id):
+    if junction_id not in _lane_count_cache:
+        lanes = traci.trafficlight.getControlledLanes(junction_id)
+        _lane_count_cache[junction_id] = max(1, len(set(lanes)))
+    return _lane_count_cache[junction_id]
 
 ACTIONS = [0, 1, 2]  # hold / extend / switch, same encoding as Stage 3
 NUM_ACTIONS = len(ACTIONS)
@@ -166,7 +181,7 @@ def get_pressure(junction_id):
     lanes = traci.trafficlight.getControlledLanes(junction_id)
     incoming = sum(traci.lane.getLastStepVehicleNumber(l) for l in set(lanes))
     outgoing = sum(traci.lane.getLastStepHaltingNumber(l) for l in set(lanes)) * 0.5
-    return (incoming - outgoing) / 10
+    return (incoming - outgoing) / (10 * get_lane_count(junction_id))
 
 
 def get_total_fuel():
@@ -299,7 +314,7 @@ def compute_reward(junction_id, new_data, all_new_metrics):
     delta_q = (prev_q - queue) / (prev_q + 1)
     delta_w = (prev_w - wait) / (prev_w + 1)
 
-    throughput_reward = -0.3 * queue
+    throughput_reward = -0.3 * (queue / get_lane_count(junction_id))
 
     neighbors = NEIGHBORS.get(junction_id, [])
     if neighbors:
@@ -476,7 +491,8 @@ for episode in range(NUM_EPISODES):
         phase_start_time[jid] = 0
         last_seen_phase[jid] = -1
 
-    traci.start([SUMO_BINARY, "-c", CONFIG_FILE, "--seed", "42"])
+    train_seed = random.choice(TRAIN_SEED_POOL)
+    traci.start([SUMO_BINARY, "-c", CONFIG_FILE, "--seed", str(train_seed)])
 
     total_reward_episode = 0
 
@@ -613,6 +629,12 @@ for episode in range(NUM_EPISODES):
 
 print("\nStage 4 (QMIX) training complete!")
 
+torch.save(
+    {jid: agents[jid].q_network.state_dict() for jid in JUNCTION_IDS},
+    os.path.join(BASE_DIR, "stage4_checkpoint.pt")
+)
+print("Saved trained Q-networks to stage4_checkpoint.pt")
+
 # -------------------------------------------------------
 # FINAL EVALUATION RUN (step 8: decentralized execution, epsilon=0,
 # mixing network + global state discarded - Sec IV-E)
@@ -637,6 +659,11 @@ eval_results = []
 
 from utils.metrics_utils import summarize_tripinfo, summarize_summary_output
 
+JN_TRACE_FILE = os.path.join(RESULTS_DIR, "jn_trace_seed42.csv")
+with open(JN_TRACE_FILE, mode="w", newline="") as f:
+    writer = csv.writer(f)
+    writer.writerow(["time", "phase", "queue", "wait", "pressure", "action"])
+    
 for seed in EVAL_SEEDS:
     TRIPINFO_FILE = os.path.join(RESULTS_DIR, f"tripinfo_stage4_seed{seed}.xml")
     SUMMARY_FILE = os.path.join(RESULTS_DIR, f"summary_stage4_seed{seed}.xml")
@@ -666,8 +693,20 @@ for seed in EVAL_SEEDS:
             obs = build_all_obs(raw)
 
             for jid in JUNCTION_IDS:
-                action, _ = agents[jid].choose_action(obs[jid])  # epsilon=0 -> always greedy
+                action, _ = agents[jid].choose_action(obs[jid])
                 apply_action(jid, action, now)
+
+                if jid == JN_ID and seed == 42:
+                    with open(JN_TRACE_FILE, mode="a", newline="") as f:
+                        writer = csv.writer(f)
+                        writer.writerow([
+                            round(now, 1),
+                            raw[jid]["phase"],
+                            raw[jid]["queue"],
+                            round(raw[jid]["wait"], 2),
+                            round(get_pressure(jid), 4),
+                            action,
+                        ])
 
             eval_fuel += get_total_fuel()
     finally:
