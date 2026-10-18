@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!-- generated on 2026-10-18 13:37:50.615990 by Eclipse SUMO randomTrips.py v1_27_1+0000-7717f2379d9
+<configuration>
+    <net-file value="smart5_main_updated.net.xml"/>
+    <additional-files value="emergency_vtype.add.xml"/>
+    <output-trip-file value="rand_ambulance.trips.xml"/>
+    <route-file value="rand_ambulance.rou.xml"/>
+    <prefix value="amb_"/>
+    <trip-attributes value="type=&quot;ambulance&quot; departLane=&quot;best&quot; departSpeed=&quot;max&quot;"/>
+    <fringe-factor value="10"/>
+    <seed value="99"/>
+    <min-distance value="1000.0"/>
+    <period value="120.0"/>
+</configuration>
+-->
+
+<routes xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/routes_file.xsd">
+    <trip id="amb_0" depart="0.00" from="1251115921#1" to="1153236079" type="ambulance" departLane="best" departSpeed="max"/>
+    <trip id="amb_1" depart="120.00" from="123262808" to="151829692#1" type="ambulance" departLane="best" departSpeed="max"/>
+    <trip id="amb_2" depart="240.00" from="1189082075#5.102" to="1170388412#0" type="ambulance" departLane="best" departSpeed="max"/>
+    <trip id="amb_3" depart="360.00" from="E5" to="-992705569" type="ambulance" departLane="best" departSpeed="max"/>
+    <trip id="amb_4" depart="480.00" from="1465267571#5" to="E4" type="ambulance" departLane="best" departSpeed="max"/>
+    <trip id="amb_5" depart="600.00" from="E3" to="E4" type="ambulance" departLane="best" departSpeed="max"/>
+    <trip id="amb_6" depart="720.00" from="E5" to="1175824712" type="ambulance" departLane="best" departSpeed="max"/>
+    <trip id="amb_7" depart="840.00" from="1189082075#5.102" to="1466470899#2" type="ambulance" departLane="best" departSpeed="max"/>
+    <trip id="amb_8" depart="960.00" from="1465267571#5" to="E6" type="ambulance" departLane="best" departSpeed="max"/>
+    <trip id="amb_9" depart="1080.00" from="1265532934#1" to="-1190307196#0" type="ambulance" departLane="best" departSpeed="max"/>
+    <trip id="amb_10" depart="1200.00" from="177566553#6" to="-992705569" type="ambulance" departLane="best" departSpeed="max"/>
+    <trip id="amb_11" depart="1320.00" from="1265532934#1" to="1465104016" type="ambulance" departLane="best" departSpeed="max"/>
+    <trip id="amb_12" depart="1440.00" from="E5" to="1465104015" type="ambulance" departLane="best" departSpeed="max"/>
+    <trip id="amb_13" depart="1560.00" from="E7" to="553958820#0" type="ambulance" departLane="best" departSpeed="max"/>
+    <trip id="amb_14" depart="1680.00" from="1251115921#5" to="E4" type="ambulance" departLane="best" departSpeed="max"/>
+    <trip id="amb_15" depart="1800.00" from="1265532934#1" to="1465104016" type="ambulance" departLane="best" departSpeed="max"/>
+    <trip id="amb_16" depart="1920.00" from="1189082075#5.102" to="1170388412#0" type="ambulance" departLane="best" departSpeed="max"/>
+    <trip id="amb_17" depart="2040.00" from="177566553#8" to="-992705569" type="ambulance" departLane="best" departSpeed="max"/>
+    <trip id="amb_18" depart="2160.00" from="1189082075#5.102" to="1465104016" type="ambulance" departLane="best" departSpeed="max"/>
+    <trip id="amb_19" depart="2280.00" from="E7" to="183255900#0" type="ambulance" departLane="best" departSpeed="max"/>
+    <trip id="amb_20" depart="2400.00" from="992705569" to="213710792#3" type="ambulance" departLane="best" departSpeed="max"/>
+    <trip id="amb_21" depart="2520.00" from="-1170388412#0" to="553962920" type="ambulance" departLane="best" departSpeed="max"/>
+    <trip id="amb_22" depart="2640.00" from="E7" to="1170388412#0" type="ambulance" departLane="best" departSpeed="max"/>
+    <trip id="amb_23" depart="2760.00" from="E7" to="1175824712" type="ambulance" departLane="best" departSpeed="max"/>
+    <trip id="amb_24" depart="2880.00" from="-553958820#10.154" to="E4" type="ambulance" departLane="best" departSpeed="max"/>
+    <trip id="amb_25" depart="3000.00" from="-553958820#10.154" to="177566553#7" type="ambulance" departLane="best" departSpeed="max"/>
+    <trip id="amb_26" depart="3120.00" from="992705569" to="1251115928" type="ambulance" departLane="best" departSpeed="max"/>
+    <trip id="amb_27" depart="3240.00" from="1465267571#5" to="E6" type="ambulance" departLane="best" departSpeed="max"/>
+    <trip id="amb_28" depart="3360.00" from="1190307196#0" to="1254116588" type="ambulance" departLane="best" departSpeed="max"/>
+    <trip id="amb_29" depart="3480.00" from="E5" to="1170388412#0" type="ambulance" departLane="best" departSpeed="max"/>
+</routes>

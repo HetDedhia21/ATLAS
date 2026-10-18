@@ -1,0 +1,7 @@
+   <additional>
+       <vType id="bus" length="10.50" minGap="2.50" maxSpeed="13.90" vClass="bus" color="0,128,255" accel="1.2" decel="3.5" sigma="0.5"/>
+       <vType id="motorbike" length="2.00" minGap="1.00" maxSpeed="20.00" vClass="motorcycle" color="red" accel="3.5" decel="5.0" sigma="0.7"/>
+       <vType id="car" length="4.50" minGap="2.00" maxSpeed="16.70" vClass="passenger" color="yellow" accel="2.6" decel="4.5" sigma="0.5"/>
+       <vType id="truck" length="8.00" minGap="3.00" maxSpeed="13.90" vClass="truck" color="153,77,0" accel="1.0" decel="3.0" sigma="0.5"/>
+       <vType id="rickshaw" length="2.80" minGap="1.50" maxSpeed="11.10" vClass="passenger" guiShape="passenger/van" color="green" accel="1.8" decel="3.5" sigma="0.6"/>
+   </additional>
