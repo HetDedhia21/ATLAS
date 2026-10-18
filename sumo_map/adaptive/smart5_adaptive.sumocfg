@@ -1,39 +1,25 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<sumoConfiguration xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/sumoConfiguration.xsd">
+<!-- generated on 2026-10-17T18:14:48.705511+05:30 by Eclipse SUMO sumo 1.27.1
+-->
 
-    <!-- ========================= -->
-    <!-- INPUT FILES -->
-    <!-- ========================= -->
+<sumoConfiguration xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/sumoConfiguration.xsd">
+
     <input>
-        <net-file value="C:\Users\Tanish Gupta\ATLAS\sumo_map\network\smart5_main_updated.net.xml"/>
-        <route-files value="../network/smart5_flows.rou.xml"/>
+        <net-file value="../network/smart5_main_updated.net.xml"/>
+        <route-files value="../network/rand_car.rou.xml,../network/rand_bike.rou.xml,../network/rand_rick.rou.xml,../network/rand_bus.rou.xml,../network/rand_truck.rou.xml,../network/rand_ambulance.rou.xml"/>
         <additional-files value="../network/smart5.poly.xml"/>
     </input>
 
-    <!-- ========================= -->
-    <!-- SIMULATION TIME -->
-    <!-- ========================= -->
-    <time>
-        <begin value="0"/>
-        <end value="400"/>                <!-- MATCHED WITH PYTHON -->
-        <step-length value="1"/>          <!-- MUCH FASTER -->
-    </time>
-
-    <!-- ========================= -->
-    <!-- OUTPUT FILES -->
-    <!-- ========================= -->
     <output>
-        <tripinfo-output value="results/tripinfo_smart.xml"/>
         <summary-output value="results/summary_smart.xml"/>
+        <tripinfo-output value="results/tripinfo_smart.xml"/>
     </output>
 
-    <!-- ========================= -->
-    <!-- RANDOMNESS (IMPORTANT) -->
-    <!-- ========================= -->
-    <!-- <random_number>
-        <seed value="random"/>
-    </random_number> -->
+    <time>
+        <begin value="0"/>
+        <end value="400"/>
+        <step-length value="1"/>
+    </time>
 
 </sumoConfiguration>
